@@ -8,7 +8,7 @@ TEST(IOTest, input) {
     game.input(f);
     stringstream ss;
     FieldController::dump(game.getField(Me), ss);
-    EXPECT_EQ(ss.str(),""
+    EXPECT_EQ(ss.str(), ""
             "......\n"
             "......\n"
             "......\n"

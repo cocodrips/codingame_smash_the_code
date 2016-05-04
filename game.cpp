@@ -66,6 +66,7 @@ public:
             }
         }
 
+
         if (!OK) {
             return field;
         }
@@ -74,25 +75,104 @@ public:
     }
 
     static void vanish(Field *field, int *score) {
-        // 横
-        int prev = -1;
-        int connect = 1;
 
+        int prev = -1;
+        int counter = 1;
         bool isVanish[ROW][COL] = {};
 
+        // たて
         REP(col, COL) {
             prev = -1;
+            counter = 0;
             REP(row, ROW) {
                 int cell = field->cell[row][col];
-                if ((cell != prev || row == ROW - 1) && connect >= MINCONNECT) {
-                    FOR(r, row - connect, row) {
-                        isVanish[r][col] = true;
-                    }
-                    connect = 0;
+                connect(cell, prev, row * COL + col, -COL,
+                        row == ROW - 1, &counter, (bool *) isVanish);
+                prev = cell;
+            }
+        }
+
+        // 横
+        REP(row, ROW) {
+            prev = -1;
+            counter = 0;
+            REP(col, COL) {
+                int cell = field->cell[row][col];
+                connect(cell, prev, row * COL + col, -1,
+                        col == COL - 1, &counter, (bool *) isVanish);
+                prev = cell;
+            }
+        }
+
+        // 右上に斜め
+        REP(sum, ROW + COL) {
+            prev = -1;
+            counter = 0;
+            REP(col, COL) {
+                int row = sum - col;
+                if (col < 0 || COL <= col || row < 0 || ROW <= row) continue;
+                int cell = field->cell[row][col];
+                connect(cell, prev, row * COL + col, COL - 1,
+                        col == COL - 1, &counter, (bool *) isVanish);
+                prev = cell;
+
+            }
+        }
+
+        REP(sum, ROW + COL) {
+            prev = -1;
+            counter = 0;
+            RREP(col, COL) {
+                int row = sum - (COL - col + 1);
+                if (col < 0 || COL <= col || row < 0 || ROW <= row) continue;
+                int cell = field->cell[row][col];
+                connect(cell, prev, row * COL + col, COL + 1,
+                        col == COL - 1, &counter, (bool *) isVanish);
+                prev = cell;
+
+            }
+        }
+
+
+        REP (r, ROW) {
+            REP(c, COL) {
+                if (isVanish[r][c]) {
+                    field->cell[r][c] = -2;
                 }
             }
         }
 
+        // 落とす
+        REP (col, COL) {
+            int bottomRow = ROW - 1;
+            RREP(row, ROW) {
+                int cell = field->cell[row][col];
+                if (cell >= 0) {
+                    field->cell[bottomRow--][col] = cell;
+                }
+            }
+            while (bottomRow >= 0) {
+                field->cell[bottomRow][col] = -2;
+                bottomRow--;
+            }
+        }
+    }
+
+
+    static void connect(int cell, int prev, int cell_index, int prev_cell,
+                        bool isLast, int *counter, bool *isVanish) {
+        if (cell == prev) {
+            (*counter)++;
+        }
+
+        if (cell != prev || isLast) {
+            if (*counter >= MINCONNECT && prev > 0) {
+                REP(i, *counter) {
+                    isVanish[cell_index + prev_cell * (i + 1)] = true;
+                }
+            }
+            *counter = 1;
+        }
     }
 };
 
@@ -145,7 +225,7 @@ public:
         return drops[i];
     }
 
-    void input(istream& cin) {
+    void input(istream &cin) {
         for (int i = 0; i < 8; i++) {
             int colorA, colorB;
             cin >> colorA >> colorB;
