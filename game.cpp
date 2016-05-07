@@ -54,27 +54,37 @@ public:
         }
     }
 
-    static Field next(Field field, const Drop &drop, int dropCol, int *outScore) {
-        *outScore = -1;
+    static bool next(Field *field, const Drop &drop, int dropCol, int *outScore) {
+
+        *outScore = 0;
         bool OK = false;
-        REP (r, ROW - 1) {
-            if (field.cell[r][dropCol] < 0) {
-                field.cell[r][dropCol] = drop.color[0];
-                field.cell[r + 1][dropCol] = drop.color[1];
+        RREP (r, ROW - 1) {
+            if (field->cell[r][dropCol] < 0) {
+                field->cell[r][dropCol] = drop.color[0];
+                field->cell[r - 1][dropCol] = drop.color[1];
                 OK = true;
                 break;
             }
         }
 
-
         if (!OK) {
-            return field;
+            return false;
         }
 
-        return field;
+        for(int i = 1;;i++) {
+//            FieldController::dump(*field, cerr);
+            int score = vanish(field);
+            if (score == 0) {
+                break;
+            }
+            *outScore += i * 10 * score;
+        }
+        return true;
     }
 
-    static void vanish(Field *field, int *score) {
+    static int vanish(Field *field) {
+        // 消えたぷよがあればtrueを返す
+        int vanishedNum = 0;
 
         int prev = -1;
         int counter = 1;
@@ -137,10 +147,19 @@ public:
         REP (r, ROW) {
             REP(c, COL) {
                 if (isVanish[r][c]) {
+                    vanishedNum++;
                     field->cell[r][c] = -2;
                 }
             }
         }
+
+//        dump
+//        REP (r, ROW) {
+//            REP(c, COL) {
+//                cerr << (int)isVanish[r][c];
+//            }
+//            cerr << endl;
+//        }
 
         // 落とす
         REP (col, COL) {
@@ -156,6 +175,7 @@ public:
                 bottomRow--;
             }
         }
+        return vanishedNum;
     }
 
 
@@ -166,9 +186,10 @@ public:
         }
 
         if (cell != prev || isLast) {
+            int adjust = isLast ? -1 : 0;
             if (*counter >= MINCONNECT && prev > 0) {
                 REP(i, *counter) {
-                    isVanish[cell_index + prev_cell * (i + 1)] = true;
+                    isVanish[cell_index + prev_cell * (i + 1 + adjust)] = true;
                 }
             }
             *counter = 1;
@@ -188,29 +209,16 @@ public:
         int score = 0;
 
         REP (col, COL) {
-            Field nextField = FieldController::next(fields[Me], drops[0], col, &score);
-            score = getEvaluation(nextField, 1);
-            if (bestScore < score) {
-                bestScore = score;
-                bestCol = col;
+            Field field = fields[Me];
+            if (FieldController::next(&field, drops[0], col, &score)) {
+                if (bestScore < score) {
+                    bestScore = score;
+                    bestCol = col;
+                }
             }
         }
 
         return bestCol;
-    }
-
-    int getEvaluation(Field currentField, int turn) {
-        int score;
-        if (turn == DROP) {
-            return score;
-        }
-
-        REP(col, COL) {
-            Field nextField = FieldController::next(fields[Me], drops[turn], col, &score);
-            score += getEvaluation(nextField, turn + 1);
-        }
-
-        return score;
     }
 
     void setField(int character, int row, int col, int value) {
