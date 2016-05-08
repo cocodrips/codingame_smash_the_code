@@ -1,7 +1,7 @@
 #ifndef SMASH_MAIN
 #define SMASH_MAIN
 
-//#define DUMP_INPUT
+#define DUMP_INPUT
 
 #include <iostream>
 #include <fstream>
@@ -25,9 +25,11 @@ const int secondDropPosition[DS] = {1, 0, -1, 0};
 using namespace std;
 
 const int ROW = 12;
+const int DANGER_ROW = 4;
 const int COL = 6;
 const int DROP = 8;
 const int MINCONNECT = 4;
+const int INF = 100000;
 
 enum Character {
     Me,
@@ -41,6 +43,12 @@ struct Field {
 struct Drop {
     int color[2];
     int rotate;
+};
+
+class Evaluation {
+public:
+    const static int connectNext = 20;
+    const static int dangerLine = -500;
 };
 
 class FieldController {
@@ -86,6 +94,42 @@ public:
             RREP (r, ROW - 1) {
                 if (field->cell[r][col] < 0) {
                     field->cell[r][col] = drop.color[d];
+                    if (r < DANGER_ROW) {
+                        *outScore += Evaluation::dangerLine;
+                    }
+
+//                    FieldController::dump(*field, cerr);
+
+                    if (r < ROW -1) {
+                        if (field->cell[r][col] == field->cell[r + 1][col]) {
+                            *outScore += Evaluation::connectNext;
+//                            FieldController::dump(*field, cerr);
+//                            cerr << "same color " << r << " " << col << " (" << field->cell[r][col] << " " << *outScore << endl;
+
+                        }
+                        if (field->cell[r][col] != field->cell[r + 1][col]) {
+//                            *outScore -= Evaluation::connectNext;
+                        }
+                    }
+
+                    if (col > 0) {
+                        if (field->cell[r][col] == field->cell[r][col - 1]) {
+                            *outScore += Evaluation::connectNext;
+                        }
+                        if (field->cell[r][col] != field->cell[r][col - 1]) {
+//                            *outScore -= Evaluation::connectNext;
+                        }
+                    }
+
+                    if (col < COL - 1) {
+                        if (field->cell[r][col] == field->cell[r][col + 1]) {
+                            *outScore += Evaluation::connectNext;
+                        }
+                        if (field->cell[r][col] != field->cell[r][col + 1]) {
+//                            *outScore -= Evaluation::connectNext;
+                        }
+                    }
+
                     OK = true;
                     break;
                 }
@@ -255,10 +299,11 @@ public:
 
         int score;
         REP (col, COL) {
-            REP (rot, 4) {
+            REP (rot, 1) {
                 Field field = *_field;
                 FieldController::next(&field, drops[turn], rot, col, &score);
                 int _score = bestNextScore(&field, bestScore, prevScore + score, turn + 1);
+//                int _score = score;
                 if (bestScore < _score) {
                     bestScore = _score;
                 }
@@ -270,19 +315,21 @@ public:
     }
 
     int getNext(int *rot) {
-        int bestScore = 0;
+        int bestScore = -INF;
         int bestCol = 0;
         int bestRotation = 0;
         int score = 0;
+
+        int randMod = rand() % 10;
 
         REP (col, COL) {
             REP (rotation, 4) {
                 Field field = fields[Me];
                 bool hasSpace = FieldController::next(&field, drops[0], rotation, col, &score);
                 if (!hasSpace) continue;
-                int _score = bestNextScore(&field, 0, score, 1);
-
-                if (bestScore < _score || (bestScore == _score && rand() % 2 == 0)) {
+                int _score = bestNextScore(&field, score, score, 1);
+                cerr << col << " rot: " << rotation << " score: " << _score << endl;
+                if (bestScore < _score || (bestScore == _score && rand() % 5 == 0)) {
                     bestScore = _score;
                     bestCol = col;
                     bestRotation = rotation;
@@ -311,7 +358,7 @@ public:
             int colorA, colorB;
             cin >> colorA >> colorB;
             drops[i].color[0] = colorA;
-            drops[i].color[1] = colorA;
+            drops[i].color[1] = colorB;
 #ifdef DUMP_INPUT
             cerr << colorA << " " << colorB << endl;
 #endif
@@ -343,8 +390,8 @@ public:
 };
 
 #endif //SMASH_MAIN
-//
-//
+
+
 //int main() {
 //    Game game = Game();
 //    int turn = 0;
