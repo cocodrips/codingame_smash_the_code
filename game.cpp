@@ -47,8 +47,10 @@ struct Drop {
 
 class Evaluation {
 public:
-    const static int connectNext = 20;
-    const static int dangerLine = -500;
+    const static int connectNext = 30;
+    const static int connectNextDown = 20;
+    const static int kannuki = 20;
+    const static int dangerLine = -100;
 };
 
 class FieldController {
@@ -103,12 +105,27 @@ public:
                     if (r < ROW -1) {
                         if (field->cell[r][col] == field->cell[r + 1][col]) {
                             *outScore += Evaluation::connectNext;
-//                            FieldController::dump(*field, cerr);
-//                            cerr << "same color " << r << " " << col << " (" << field->cell[r][col] << " " << *outScore << endl;
-
                         }
                         if (field->cell[r][col] != field->cell[r + 1][col]) {
 //                            *outScore -= Evaluation::connectNext;
+                        }
+
+                        if (col < COL - 1) {
+                            if (field->cell[r][col] == field->cell[r + 1][col + 1]) {
+                                *outScore += Evaluation::connectNextDown;
+                            }
+                        }
+
+                        if (col > 0) {
+                            if (field->cell[r][col] == field->cell[r + 1][col - 1]) {
+                                *outScore += Evaluation::connectNextDown;
+                            }
+                        }
+                    }
+
+                    if (r < ROW - 2) {
+                        if (field->cell[r][col] == field->cell[r + 2][col]) {
+                            *outScore += Evaluation::kannuki;
                         }
                     }
 
@@ -116,17 +133,11 @@ public:
                         if (field->cell[r][col] == field->cell[r][col - 1]) {
                             *outScore += Evaluation::connectNext;
                         }
-                        if (field->cell[r][col] != field->cell[r][col - 1]) {
-//                            *outScore -= Evaluation::connectNext;
-                        }
                     }
 
                     if (col < COL - 1) {
                         if (field->cell[r][col] == field->cell[r][col + 1]) {
                             *outScore += Evaluation::connectNext;
-                        }
-                        if (field->cell[r][col] != field->cell[r][col + 1]) {
-//                            *outScore -= Evaluation::connectNext;
                         }
                     }
 
@@ -143,17 +154,20 @@ public:
 
         for (int i = 1; ; i++) {
 //            FieldController::dump(*field, cerr);
-            int score = vanish(field);
-            if (score == 0) {
+            int vanishNum = vanish(field);
+            if (vanishNum == 0) {
                 break;
             }
-            *outScore += i * 10 * score;
+            if (i == 1) {
+                vanishNum -= 8;
+            }
+            *outScore += i * 10 * vanishNum;
         }
         return true;
     }
 
 
-    static int vanish(Field *field) {
+    static int vanish(Field *field, int *fieldScore) {
         bool visited[ROW * COL] = {};
         bool isVanish[ROW * COL] = {};
         int connect[ROW * COL] = {};
@@ -222,6 +236,8 @@ public:
 //                        cerr << "--" << connect[i] << endl;
                         isVanish[connect[i]] = true;
                     }
+                } else if (connectColorCounter == 3 ) {
+                    fieldScore +=
                 }
 
 
