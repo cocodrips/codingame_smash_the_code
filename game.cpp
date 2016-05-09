@@ -1,7 +1,7 @@
 #ifndef SMASH_MAIN
 #define SMASH_MAIN
 
-#define DUMP_INPUT
+//#define DUMP_INPUT
 
 #include <iostream>
 #include <fstream>
@@ -29,7 +29,7 @@ const int DANGER_ROW = 4;
 const int COL = 6;
 const int DROP = 8;
 const int MINCONNECT = 4;
-const int INF = 100000;
+const int INF = 1000000;
 
 enum Character {
     Me,
@@ -49,6 +49,8 @@ class Evaluation {
 public:
     const static int connectNext = 30;
     const static int connectNextDown = 20;
+    const static int connect3 = 30;
+    const static int connect2 = 15;
     const static int kannuki = 20;
     const static int dangerLine = -100;
 };
@@ -75,9 +77,10 @@ public:
         }
     }
 
-    static bool next(Field *field, const Drop &drop, int dropRotation, int dropCol, int *outScore) {
+    static bool next(Field *field, const Drop &drop, int dropRotation, int dropCol, int *outScore, bool *isVanished) {
 
         *outScore = 0;
+        *isVanished = false;
         bool OK = false;
 
         REP(i, 2) {
@@ -93,53 +96,22 @@ public:
             }
             if (col < 0 || COL <= col) return false;
 
-            RREP (r, ROW - 1) {
+            RREP (r, ROW - 2) {
                 if (field->cell[r][col] < 0) {
                     field->cell[r][col] = drop.color[d];
+
                     if (r < DANGER_ROW) {
                         *outScore += Evaluation::dangerLine;
                     }
 
-//                    FieldController::dump(*field, cerr);
-
-                    if (r < ROW -1) {
-                        if (field->cell[r][col] == field->cell[r + 1][col]) {
-                            *outScore += Evaluation::connectNext;
-                        }
-                        if (field->cell[r][col] != field->cell[r + 1][col]) {
-//                            *outScore -= Evaluation::connectNext;
-                        }
-
-                        if (col < COL - 1) {
-                            if (field->cell[r][col] == field->cell[r + 1][col + 1]) {
-                                *outScore += Evaluation::connectNextDown;
-                            }
-                        }
-
-                        if (col > 0) {
-                            if (field->cell[r][col] == field->cell[r + 1][col - 1]) {
-                                *outScore += Evaluation::connectNextDown;
-                            }
-                        }
-                    }
 
                     if (r < ROW - 2) {
-                        if (field->cell[r][col] == field->cell[r + 2][col]) {
+                        if (field->cell[r][col] == field->cell[r + 2][col] &&
+                                field->cell[r][col] != field->cell[r + 1][col]) {
                             *outScore += Evaluation::kannuki;
                         }
                     }
 
-                    if (col > 0) {
-                        if (field->cell[r][col] == field->cell[r][col - 1]) {
-                            *outScore += Evaluation::connectNext;
-                        }
-                    }
-
-                    if (col < COL - 1) {
-                        if (field->cell[r][col] == field->cell[r][col + 1]) {
-                            *outScore += Evaluation::connectNext;
-                        }
-                    }
 
                     OK = true;
                     break;
@@ -151,18 +123,26 @@ public:
             }
         }
 
-
+        int fieldScore = 0;
+        int vanishScore = 0;
         for (int i = 1; ; i++) {
-//            FieldController::dump(*field, cerr);
-            int vanishNum = vanish(field);
+            fieldScore = 0;
+            int vanishNum = vanish(field, &fieldScore);
             if (vanishNum == 0) {
                 break;
             }
+            *isVanished=true;
             if (i == 1) {
                 vanishNum -= 8;
             }
-            *outScore += i * 10 * vanishNum;
+            vanishScore += i * 10 * (vanishNum * vanishNum);
         }
+        *outScore = vanishScore + fieldScore;
+        if (vanishScore > 120) {
+            *outScore += 500;
+        }
+
+
         return true;
     }
 
@@ -231,15 +211,14 @@ public:
 
 
                 if (connectColorCounter >= 4) {
-//                    cerr << "counter:" << connectColorCounter << endl;
                     REP (i, connectCounter) {
-//                        cerr << "--" << connect[i] << endl;
                         isVanish[connect[i]] = true;
                     }
                 } else if (connectColorCounter == 3 ) {
-                    fieldScore +=
+                    *fieldScore += Evaluation::connect3;
+                } else if (connectColorCounter == 2 ) {
+                    *fieldScore += Evaluation::connect2;
                 }
-
 
             }
         }
@@ -278,6 +257,14 @@ public:
                 bottomRow--;
             }
         }
+
+        REP (col, COL) {
+            REP (row, DANGER_ROW) {
+                if (field->cell[row][col] > 0) {
+                    fieldScore -= Evaluation::dangerLine;
+                }
+            }
+        }
         return vanishedNum;
 
 
@@ -311,15 +298,18 @@ public:
 
     // return best score
     int bestNextScore(Field *_field, int bestScore, int prevScore, int turn) {
-        if (turn == 3) return prevScore;
+        if (turn == 2) return prevScore;
 
         int score;
         REP (col, COL) {
-            REP (rot, 1) {
+            REP (rot, 4) {
                 Field field = *_field;
-                FieldController::next(&field, drops[turn], rot, col, &score);
-                int _score = bestNextScore(&field, bestScore, prevScore + score, turn + 1);
-//                int _score = score;
+                bool isVanished = false;
+                FieldController::next(&field, drops[turn], rot, col, &score, &isVanished);
+                int _score = score;
+                if (!isVanished){
+                    _score = bestNextScore(&field, bestScore, score, turn + 1);
+                }
                 if (bestScore < _score) {
                     bestScore = _score;
                 }
@@ -341,9 +331,14 @@ public:
         REP (col, COL) {
             REP (rotation, 4) {
                 Field field = fields[Me];
-                bool hasSpace = FieldController::next(&field, drops[0], rotation, col, &score);
+                bool isVanished = false;
+                bool hasSpace = FieldController::next(&field, drops[0], rotation, col, &score, &isVanished);
                 if (!hasSpace) continue;
-                int _score = bestNextScore(&field, score, score, 1);
+
+                int _score = score;
+                if (!isVanished) {
+                    _score = bestNextScore(&field, score, score, 1);
+                }
                 cerr << col << " rot: " << rotation << " score: " << _score << endl;
                 if (bestScore < _score || (bestScore == _score && rand() % 5 == 0)) {
                     bestScore = _score;

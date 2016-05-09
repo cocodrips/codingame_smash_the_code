@@ -36,7 +36,9 @@ TEST(VanishTest, next_block) {
 
     int score = 0;
     Field field = game.getField(Me);
-    FieldController::next(&field, game.getDrop(0), 0, 0, &score);
+    bool isVanished = false;
+
+    FieldController::next(&field, game.getDrop(0), 0, 0, &score, &isVanished);
     stringstream ss;
     FieldController::dump(field, ss);
 
